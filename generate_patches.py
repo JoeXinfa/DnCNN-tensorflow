@@ -34,9 +34,9 @@ def generate_patches(isDebug=False):
     scales = [1, 0.9, 0.8, 0.7]
 
     # calculate the number of patches
-    for i in xrange(len(filepaths)):
+    for i in range(len(filepaths)):
         img = Image.open(filepaths[i]).convert('L')  # convert RGB to gray
-        for s in xrange(len(scales)):
+        for s in range(len(scales)):
             newsize = (int(img.size[0] * scales[s]), int(img.size[1] * scales[s]))
             img_s = img.resize(newsize, resample=PIL.Image.BICUBIC)  # do not change the original img
             im_h, im_w = img_s.size
@@ -57,16 +57,16 @@ def generate_patches(isDebug=False):
 
     count = 0
     # generate patches
-    for i in xrange(len(filepaths)):
+    for i in range(len(filepaths)):
         img = Image.open(filepaths[i]).convert('L')
-        for s in xrange(len(scales)):
+        for s in range(len(scales)):
             newsize = (int(img.size[0] * scales[s]), int(img.size[1] * scales[s]))
             # print newsize
             img_s = img.resize(newsize, resample=PIL.Image.BICUBIC)
             img_s = np.reshape(np.array(img_s, dtype="uint8"),
                                (img_s.size[0], img_s.size[1], 1))  # extend one dimension
 
-            for j in xrange(DATA_AUG_TIMES):
+            for j in range(DATA_AUG_TIMES):
                 im_h, im_w, _ = img_s.shape
                 for x in range(0 + args.step, im_h - args.pat_size, args.stride):
                     for y in range(0 + args.step, im_w - args.pat_size, args.stride):

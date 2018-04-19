@@ -6,7 +6,7 @@ from utils import *
 def dncnn(input, is_training=True, output_channels=1):
     with tf.variable_scope('block1'):
         output = tf.layers.conv2d(input, 64, 3, padding='same', activation=tf.nn.relu)
-    for layers in xrange(2, 16 + 1):
+    for layers in range(2, 16 + 1):
         with tf.variable_scope('block%d' % layers):
             output = tf.layers.conv2d(output, 64, 3, padding='same', name='conv%d' % layers, use_bias=False)
             output = tf.nn.relu(tf.layers.batch_normalization(output, training=is_training))
@@ -42,7 +42,7 @@ class denoiser(object):
         # assert test_data value range is 0-255
         print("[*] Evaluating...")
         psnr_sum = 0
-        for idx in xrange(len(test_data)):
+        for idx in range(len(test_data)):
             clean_image = test_data[idx].astype(np.float32) / 255.0
             output_clean_image, noisy_image, psnr_summary = self.sess.run(
                 [self.Y, self.X, summary_merged],
@@ -92,9 +92,9 @@ class denoiser(object):
         start_time = time.time()
         self.evaluate(iter_num, eval_data, sample_dir=sample_dir, summary_merged=summary_psnr,
                       summary_writer=writer)  # eval_data value range is 0-255
-        for epoch in xrange(start_epoch, epoch):
+        for epoch in range(start_epoch, epoch):
             np.random.shuffle(data)
-            for batch_id in xrange(start_step, numBatch):
+            for batch_id in range(start_step, numBatch):
                 batch_images = data[batch_id * batch_size:(batch_id + 1) * batch_size, :, :, :]
                 # batch_images = batch_images.astype(np.float32) / 255.0 # normalize the data to 0-1
                 _, loss, summary = self.sess.run([self.train_op, self.loss, merged],
@@ -142,7 +142,7 @@ class denoiser(object):
         print(" [*] Load weights SUCCESS...")
         psnr_sum = 0
         print("[*] " + 'noise level: ' + str(self.sigma) + " start testing...")
-        for idx in xrange(len(test_files)):
+        for idx in range(len(test_files)):
             clean_image = load_images(test_files[idx]).astype(np.float32) / 255.0
             output_clean_image, noisy_image = self.sess.run([self.Y, self.X],
                                                             feed_dict={self.Y_: clean_image, self.is_training: False})
