@@ -30,7 +30,7 @@ def generate_patches(isDebug=False):
     filepaths = glob.glob(args.src_dir + '/*.png')
     if isDebug:
         filepaths = filepaths[:10]
-    print "number of training data %d" % len(filepaths)
+    print("number of training data %d" % len(filepaths))
 
     scales = [1, 0.9, 0.8, 0.7]
 
@@ -50,8 +50,8 @@ def generate_patches(isDebug=False):
         numPatches = (origin_patch_num / args.bat_size + 1) * args.bat_size
     else:
         numPatches = origin_patch_num
-    print "total patches = %d , batch size = %d, total batches = %d" % \
-          (numPatches, args.bat_size, numPatches / args.bat_size)
+    print("total patches = %d , batch size = %d, total batches = %d" %
+          (numPatches, args.bat_size, numPatches / args.bat_size))
 
     # data matrix 4-D
     inputs = np.zeros((numPatches, args.pat_size, args.pat_size, 1), dtype="uint8")
@@ -62,7 +62,7 @@ def generate_patches(isDebug=False):
         img = Image.open(filepaths[i]).convert('L')
         for s in range(len(scales)):
             newsize = (int(img.size[0] * scales[s]), int(img.size[1] * scales[s]))
-            # print newsize
+            # print(newsize)
             img_s = img.resize(newsize, resample=Image.BICUBIC)
             img_s = np.reshape(np.array(img_s, dtype="uint8"),
                                (img_s.size[0], img_s.size[1], 1))  # extend one dimension
@@ -82,7 +82,7 @@ def generate_patches(isDebug=False):
     if not os.path.exists(args.save_dir):
         os.mkdir(args.save_dir)
     np.save(os.path.join(args.save_dir, "img_clean_pats"), inputs)
-    print "size of inputs tensor = " + str(inputs.shape)
+    print("size of inputs tensor = " + str(inputs.shape))
 
 
 if __name__ == '__main__':
