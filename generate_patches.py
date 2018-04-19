@@ -1,9 +1,10 @@
+import os
 import argparse
 import glob
-from PIL import Image
-import PIL
 import random
-from utils import *
+from PIL import Image
+import numpy as np
+from utils import data_augmentation
 
 # the pixel value range is '0-255'(uint8 ) of training data
 
@@ -38,7 +39,7 @@ def generate_patches(isDebug=False):
         img = Image.open(filepaths[i]).convert('L')  # convert RGB to gray
         for s in range(len(scales)):
             newsize = (int(img.size[0] * scales[s]), int(img.size[1] * scales[s]))
-            img_s = img.resize(newsize, resample=PIL.Image.BICUBIC)  # do not change the original img
+            img_s = img.resize(newsize, resample=Image.BICUBIC)  # do not change the original img
             im_h, im_w = img_s.size
             for x in range(0 + args.step, (im_h - args.pat_size), args.stride):
                 for y in range(0 + args.step, (im_w - args.pat_size), args.stride):
@@ -62,7 +63,7 @@ def generate_patches(isDebug=False):
         for s in range(len(scales)):
             newsize = (int(img.size[0] * scales[s]), int(img.size[1] * scales[s]))
             # print newsize
-            img_s = img.resize(newsize, resample=PIL.Image.BICUBIC)
+            img_s = img.resize(newsize, resample=Image.BICUBIC)
             img_s = np.reshape(np.array(img_s, dtype="uint8"),
                                (img_s.size[0], img_s.size[1], 1))  # extend one dimension
 

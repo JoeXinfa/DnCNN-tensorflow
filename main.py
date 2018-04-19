@@ -1,10 +1,12 @@
 import argparse
+import os
 from glob import glob
 
 import tensorflow as tf
+import numpy as np
 
 from model import denoiser
-from utils import *
+from utils import load_data, load_images
 
 parser = argparse.ArgumentParser(description='')
 parser.add_argument('--epoch', dest='epoch', type=int, default=50, help='# of epoch')
