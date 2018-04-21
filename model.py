@@ -142,7 +142,7 @@ class denoiser(object):
         assert len(test_files) != 0, 'No testing data!'
         load_model_status, global_step = self.load(ckpt_dir)
         assert load_model_status == True, '[!] Load weights FAILED...'
-        print(" [*] Load weights SUCCESS...")
+        print("[*] Load weights SUCCESS...")
         psnr_sum = 0
         print("[*] " + 'noise level: ' + str(self.sigma) + " start testing...")
         for idx in range(len(test_files)):

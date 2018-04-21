@@ -50,8 +50,10 @@ def generate_patches(isDebug=False):
         numPatches = (origin_patch_num / args.bat_size + 1) * args.bat_size
     else:
         numPatches = origin_patch_num
-    print("total patches = %d , batch size = %d, total batches = %d" %
-          (numPatches, args.bat_size, numPatches / args.bat_size))
+    numPatches = int(numPatches)
+    numBatches = int(numPatches / args.bat_size)
+    print("patch size = %d, total patches = %d" % (args.pat_size, numPatches))
+    print("batch size = %d, total batches = %d" % (args.bat_size, numBatches))
 
     # data matrix 4-D
     inputs = np.zeros((numPatches, args.pat_size, args.pat_size, 1), dtype="uint8")
@@ -62,7 +64,6 @@ def generate_patches(isDebug=False):
         img = Image.open(filepaths[i]).convert('L')
         for s in range(len(scales)):
             newsize = (int(img.size[0] * scales[s]), int(img.size[1] * scales[s]))
-            # print(newsize)
             img_s = img.resize(newsize, resample=Image.BICUBIC)
             img_s = np.reshape(np.array(img_s, dtype="uint8"),
                                (img_s.size[0], img_s.size[1], 1))  # extend one dimension
@@ -71,7 +72,7 @@ def generate_patches(isDebug=False):
                 im_h, im_w, _ = img_s.shape
                 for x in range(0 + args.step, im_h - args.pat_size, args.stride):
                     for y in range(0 + args.step, im_w - args.pat_size, args.stride):
-                        inputs[count, :, :, :] = data_augmentation(img_s[x:x + args.pat_size, y:y + args.pat_size, :], \
+                        inputs[count, :, :, :] = data_augmentation(img_s[x:x + args.pat_size, y:y + args.pat_size, :],
                                                                    random.randint(0, 7))
                         count += 1
     # pad the batch
