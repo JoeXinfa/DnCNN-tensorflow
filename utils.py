@@ -82,7 +82,8 @@ def save_images(filepath, ground_truth, noisy_image=None, clean_image=None):
     if not clean_image.any():
         cat_image = ground_truth
     else:
-        cat_image = np.concatenate([ground_truth, noisy_image, clean_image], axis=1)
+        cat_image = np.concatenate([ground_truth, noisy_image, clean_image],
+                                   axis=1)
     im = Image.fromarray(cat_image.astype('uint8')).convert('L')
     im.save(filepath, 'png')
 
@@ -96,5 +97,6 @@ def cal_psnr(im1, im2):
 
 def tf_psnr(im1, im2):
     # assert pixel value range is 0-1
-    mse = tf.losses.mean_squared_error(labels=im2 * 255.0, predictions=im1 * 255.0)
+    mse = tf.losses.mean_squared_error(labels=im2 * 255.0,
+                                       predictions=im1 * 255.0)
     return 10.0 * (tf.log(255.0 ** 2 / mse) / tf.log(10.0))
