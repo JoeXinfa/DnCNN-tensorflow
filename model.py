@@ -70,7 +70,7 @@ class denoiser(object):
                                                               feed_dict={self.Y_: data, self.is_training: False})
         return output_clean_image, noisy_image, psnr
 
-    def train(self, data, eval_data, batch_size, ckpt_dir, epoch, lr, sample_dir, eval_every_epoch=2):
+    def train(self, data, eval_data, batch_size, ckpt_dir, epoch, lr, sample_dir, log_dir, eval_every_epoch=2):
         # assert data range is between 0 and 1
         numBatch = int(data.shape[0] / batch_size)
         # load pretrained model
@@ -88,7 +88,7 @@ class denoiser(object):
         # make summary
         tf.summary.scalar('loss', self.loss)
         tf.summary.scalar('lr', self.lr)
-        writer = tf.summary.FileWriter('./logs', self.sess.graph)
+        writer = tf.summary.FileWriter(log_dir, self.sess.graph)
         merged = tf.summary.merge_all()
         summary_psnr = tf.summary.scalar('eva_psnr', self.eva_psnr)
         print("[*] Start training, with start epoch %d start iter %d : " % (start_epoch, iter_num))

@@ -1,6 +1,6 @@
 import os
 import argparse
-import glob
+from glob import glob
 import random
 from PIL import Image
 import numpy as np
@@ -12,24 +12,26 @@ from utils import data_augmentation
 DATA_AUG_TIMES = 1  # transform a sample to a different sample for DATA_AUG_TIMES times
 
 parser = argparse.ArgumentParser(description='')
-parser.add_argument('--src_dir', dest='src_dir', default='./data/Train400', help='dir of data')
-parser.add_argument('--save_dir', dest='save_dir', default='./data', help='dir of patches')
+parser.add_argument('--src_dir', dest='src_dir', default='data/Train400', help='dir of data')
+parser.add_argument('--save_dir', dest='save_dir', default='data', help='dir of patches')
 parser.add_argument('--patch_size', dest='pat_size', type=int, default=40, help='patch size')
 parser.add_argument('--stride', dest='stride', type=int, default=10, help='stride')
 parser.add_argument('--step', dest='step', type=int, default=0, help='step')
 parser.add_argument('--batch_size', dest='bat_size', type=int, default=128, help='batch size')
+parser.add_argument('--work_dir', dest='work_dir', default='.', help='work directory')
 # check output arguments
-parser.add_argument('--from_file', dest='from_file', default="./data/img_clean_pats.npy", help='get pic from file')
+parser.add_argument('--from_file', dest='from_file', default="data/img_clean_pats.npy", help='get pic from file')
 parser.add_argument('--num_pic', dest='num_pic', type=int, default=10, help='number of pic to pick')
 args = parser.parse_args()
 
 
-def generate_patches(isDebug=False):
+def generate_patches():
     global DATA_AUG_TIMES
     count = 0
-    filepaths = glob.glob(args.src_dir + '/*.png')
-    if isDebug:
-        filepaths = filepaths[:10]
+    src_dir = os.path.join(args.work_dir, args.src_dir)
+    filepaths = glob(src_dir + '/*.png')
+    num_pic = args.num_pic
+    filepaths = filepaths[:num_pic]
     print("number of training data %d" % len(filepaths))
 
     scales = [1, 0.9, 0.8, 0.7]
@@ -80,9 +82,10 @@ def generate_patches(isDebug=False):
         to_pad = numPatches - count
         inputs[-to_pad:, :, :, :] = inputs[:to_pad, :, :, :]
 
-    if not os.path.exists(args.save_dir):
-        os.mkdir(args.save_dir)
-    np.save(os.path.join(args.save_dir, "img_clean_pats"), inputs)
+    save_dir = os.path.join(args.work_dir, args.save_dir)
+    if not os.path.exists(save_dir):
+        os.mkdir(save_dir)
+    np.save(os.path.join(save_dir, "img_clean_pats"), inputs)
     print("size of inputs tensor = " + str(inputs.shape))
 
 
