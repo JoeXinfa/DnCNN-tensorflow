@@ -70,7 +70,7 @@ class denoiser(object):
                                                               feed_dict={self.Y_: data, self.is_training: False})
         return output_clean_image, noisy_image, psnr
 
-    def train(self, data, eval_data, batch_size, ckpt_dir, epoch, lr, sample_dir, log_dir, eval_every_epoch=2):
+    def train(self, data, eval_data, batch_size=128, ckpt_dir='./checkpoint', epoch=50, lr=0.001, sample_dir='./sample', log_dir='./logs', eval_every_epoch=2):
         # assert data range is between 0 and 1
         numBatch = int(data.shape[0] / batch_size)
         # load pretrained model
@@ -93,8 +93,8 @@ class denoiser(object):
         summary_psnr = tf.summary.scalar('eva_psnr', self.eva_psnr)
         print("[*] Start training, with start epoch %d start iter %d : " % (start_epoch, iter_num))
         start_time = time.time()
-        self.evaluate(iter_num, eval_data, sample_dir=sample_dir, summary_merged=summary_psnr,
-                      summary_writer=writer)  # eval_data value range is 0-255
+        self.evaluate(iter_num, eval_data, sample_dir, summary_psnr,
+                      writer)  # eval_data value range is 0-255
         for epoch in range(start_epoch, epoch):
             np.random.shuffle(data)
             for batch_id in range(start_step, numBatch):
@@ -108,8 +108,8 @@ class denoiser(object):
                 iter_num += 1
                 writer.add_summary(summary, iter_num)
             if np.mod(epoch + 1, eval_every_epoch) == 0:
-                self.evaluate(iter_num, eval_data, sample_dir=sample_dir, summary_merged=summary_psnr,
-                              summary_writer=writer)  # eval_data value range is 0-255
+                self.evaluate(iter_num, eval_data, sample_dir, summary_psnr,
+                              writer)  # eval_data value range is 0-255
                 self.save(iter_num, ckpt_dir)
         print("[*] Finish training.")
 
@@ -135,7 +135,7 @@ class denoiser(object):
         else:
             return False, 0
 
-    def test(self, test_files, ckpt_dir, save_dir):
+    def test(self, test_files, ckpt_dir='./checkpoint', save_dir='./test'):
         """Test DnCNN"""
         # init variables
         tf.initialize_all_variables().run()
