@@ -6,7 +6,7 @@ import tensorflow as tf
 import numpy as np
 
 from model import denoiser
-from utils import load_data, load_images
+from utils import load_images
 
 parser = argparse.ArgumentParser(description='')
 parser.add_argument('--epoch', dest='epoch', type=int, default=50,
@@ -43,24 +43,33 @@ args = parser.parse_args()
 
 
 def denoiser_train(denoiser, lr):
-    data_file = os.path.join(args.work_dir, 'data/img_clean_pats.npy')
-    eval_files = 'data/test/{}/*.png'.format(args.eval_set)
-    eval_files = os.path.join(args.work_dir, eval_files)
+    noisy_file = os.path.join(args.work_dir, 'data/img_noisy_pats.npy')
+    clean_file = os.path.join(args.work_dir, 'data/img_clean_pats.npy')
+    evalc_files = 'data/test/{}/clean*.png'.format(args.eval_set)
+    evalc_files = os.path.join(args.work_dir, evalc_files)
+    evaln_files = 'data/test/{}/noisy*.png'.format(args.eval_set)
+    evaln_files = os.path.join(args.work_dir, evaln_files)
     ckpt_dir = os.path.join(args.work_dir, args.ckpt_dir)
     sample_dir = os.path.join(args.work_dir, args.sample_dir)
     log_dir = os.path.join(args.work_dir, args.log_dir)
     batch_size = args.batch_size
     epoch = args.epoch
-    with load_data(filepath=data_file) as data:
-        # If there is a small memory, please comment this line and uncomment
-        # the corresponding line in model.py
-        data = data.astype(np.float32) / 255.0  # normalize the data to 0-1
-        eval_files = glob(eval_files)
-        # list of array of different size, 4-D, pixel value range is 0-255
-        eval_data = load_images(eval_files)
-        denoiser.train(data, eval_data, batch_size=batch_size,
-                       ckpt_dir=ckpt_dir, epoch=epoch, lr=lr,
-                       sample_dir=sample_dir, log_dir=log_dir)
+
+    noisy_data = np.load(noisy_file)
+    clean_data = np.load(clean_file)
+
+    # If there is a small memory, please comment this line and uncomment
+    # the corresponding line in model.py
+    noisy_data = noisy_data.astype(np.float32) / 255.0  # normalize to 0-1
+    clean_data = clean_data.astype(np.float32) / 255.0  # normalize to 0-1
+    evalc_files = glob(evalc_files)
+    evaln_files = glob(evaln_files)
+    # list of array of different size, 4-D, pixel value range is 0-255
+    evalc_data = load_images(evalc_files)
+    evaln_data = load_images(evaln_files)
+    denoiser.train(noisy_data, clean_data, evaln_data, evalc_data,
+                   batch_size=batch_size, ckpt_dir=ckpt_dir, epoch=epoch,
+                   lr=lr, sample_dir=sample_dir, log_dir=log_dir)
 
 
 def denoiser_test(denoiser):

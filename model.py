@@ -40,9 +40,11 @@ class denoiser: # Python3 style
         if phase in ['train', 'test']:
             self.Y_ = tf.placeholder(tf.float32,
                 [None, None, None, self.input_c_dim], name='clean_image')
+            self.X  = tf.placeholder(tf.float32,
+                [None, None, None, self.input_c_dim], name='noisy_image')
             self.is_training = tf.placeholder(tf.bool, name='is_training')
-            self.X = self.Y_ + tf.random_normal(shape=tf.shape(self.Y_),
-                stddev=self.sigma / 255.0)  # noisy images
+            #self.X = self.Y_ + tf.random_normal(shape=tf.shape(self.Y_),
+            #    stddev=self.sigma / 255.0)  # noisy images
             #self.X = self.Y_ + tf.truncated_normal(shape=tf.shape(self.Y_),
             #    stddev=self.sigma / 255.0)  # noisy images
             self.Y = dncnn(self.X, is_training=self.is_training)
@@ -64,28 +66,38 @@ class denoiser: # Python3 style
         self.sess.run(init)
         print("[*] Initialize model successfully...")
 
-    def evaluate(self, iter_num, test_data, sample_dir, summary_merged,
-                 summary_writer):
-        # assert test_data value range is 0-255
+    def evaluate(self, iter_num, evaln_data, evalc_data, sample_dir,
+                 summary_merged, summary_writer):
+        """
+        -i- evaln_data : list, of 4D array of different size.
+            Each array is a noisy image for evaluation, value range 0-255.
+        -i- evalc_data : list, of 4D array of different size.
+            Each array is a clean image for evaluation, value range 0-255.
+        """
+        # assert eval_data value range is 0-255
         print("[*] Evaluating...")
         psnr_sum = 0
-        for idx in range(len(test_data)):
-            clean_image = test_data[idx].astype(np.float32) / 255.0
-            output_clean_image, noisy_image, psnr_summary = self.sess.run(
-                [self.Y, self.X, summary_merged],
-                feed_dict={self.Y_: clean_image, self.is_training: False})
+        for idx in range(len(evaln_data)):
+            noisy_image = evaln_data[idx].astype(np.float32) / 255.0
+            clean_image = evalc_data[idx].astype(np.float32) / 255.0
+            output_image, psnr_summary = self.sess.run(
+                [self.Y, summary_merged],
+                feed_dict={self.X: noisy_image, self.Y_: clean_image,
+                           self.is_training: False})
             summary_writer.add_summary(psnr_summary, iter_num)
-            groundtruth = np.clip(test_data[idx], 0, 255).astype('uint8')
-            noisyimg = np.clip(255 * noisy_image, 0, 255).astype('uint8')
-            outimg = np.clip(255 * output_clean_image, 0, 255).astype('uint8')
+
+            groundtruth = np.clip(evalc_data[idx], 0, 255).astype('uint8')
+            noisy_img = np.clip(evaln_data[idx], 0, 255).astype('uint8')
+            output_img = np.clip(255 * output_image, 0, 255).astype('uint8')
+
             # calculate PSNR
-            psnr = cal_psnr(groundtruth, outimg)
+            psnr = cal_psnr(groundtruth, output_img)
             print("img%d PSNR: %.2f" % (idx + 1, psnr))
             psnr_sum += psnr
             filename = 'test%d_%d.png' % (idx + 1, iter_num)
             filename = os.path.join(sample_dir, filename)
-            save_images(filename, groundtruth, noisyimg, outimg)
-        avg_psnr = psnr_sum / len(test_data)
+            save_images(filename, groundtruth, noisy_img, output_img)
+        avg_psnr = psnr_sum / len(evaln_data)
 
         print("--- Test ---- Average PSNR %.2f ---" % avg_psnr)
 
@@ -95,11 +107,22 @@ class denoiser: # Python3 style
                 feed_dict={self.Y_: data, self.is_training: False})
         return output_clean_image, noisy_image, psnr
 
-    def train(self, data, eval_data, batch_size=128, ckpt_dir='./checkpoint',
-              epoch=50, lr=0.001, sample_dir='./sample', log_dir='./logs',
+    def train(self, noisy_data, clean_data, evaln_data, evalc_data,
+              ckpt_dir='./checkpoint', sample_dir='./sample',
+              log_dir='./logs', epoch=50, batch_size=128, lr=0.001,
               eval_every_epoch=2):
+        """
+        -i- noisy_data : array, numpy 4D (numPatches, patchSize, patchSize,
+            colorDimension)
+        -i- clean_data : array, numpy 4D (numPatches, patchSize, patchSize,
+            colorDimension)
+        -i- evaln_data : list, of 4D array of different size.
+            Each array is a noisy image for evaluation, value range 0-255.
+        -i- evalc_data : list, of 4D array of different size.
+            Each array is a clean image for evaluation, value range 0-255.
+        """
         # assert data range is between 0 and 1
-        numBatch = int(data.shape[0] / batch_size)
+        numBatch = int(noisy_data.shape[0] / batch_size)
         # load pretrained model
         load_model_status, global_step = self.load(ckpt_dir)
         if load_model_status:
@@ -121,28 +144,29 @@ class denoiser: # Python3 style
         print("[*] Start training, with start epoch %d start iter %d : " % \
               (start_epoch, iter_num))
         start_time = time.time()
-        self.evaluate(iter_num, eval_data, sample_dir, summary_psnr,
-                      writer)  # eval_data value range is 0-255
+        self.evaluate(iter_num, evaln_data, evalc_data, sample_dir,
+                      summary_psnr, writer)
         for epoch in range(start_epoch, epoch):
-            np.random.shuffle(data)
+            #np.random.shuffle(noisy_data)
             for batch_id in range(start_step, numBatch):
                 index1 = batch_id * batch_size
                 index2 = (batch_id + 1) * batch_size
-                batch_images = data[index1:index2, :, :, :]
+                noisy_batch = noisy_data[index1:index2, :, :, :]
+                clean_batch = clean_data[index1:index2, :, :, :]
                 # normalize the data to 0-1, use less memory
-                # batch_images = batch_images.astype(np.float32) / 255.0
+                # noisy_batch = noisy_batch.astype(np.float32) / 255.0
                 _, loss, summary = self.sess.run(
                     [self.train_op, self.loss, merged],
-                    feed_dict={self.Y_: batch_images, self.lr: lr[epoch],
-                               self.is_training: True})
-                print("Epoch: [%2d] [%4d/%4d] time: %4.4f, loss: %.6f"
+                    feed_dict={self.X: noisy_batch, self.Y_: clean_batch,
+                               self.lr: lr[epoch], self.is_training: True})
+                print("Epoch: %2d, batch: %4d/%4d, time (min): %d, loss: %.6f"
                       % (epoch + 1, batch_id + 1, numBatch,
-                         time.time() - start_time, loss))
+                         (time.time() - start_time) / 60, loss))
                 iter_num += 1
                 writer.add_summary(summary, iter_num)
             if np.mod(epoch + 1, eval_every_epoch) == 0:
-                self.evaluate(iter_num, eval_data, sample_dir, summary_psnr,
-                              writer)  # eval_data value range is 0-255
+                self.evaluate(iter_num, evaln_data, evalc_data, sample_dir,
+                              summary_psnr, writer)
                 self.save(iter_num, ckpt_dir)
         print("[*] Finish training.")
 

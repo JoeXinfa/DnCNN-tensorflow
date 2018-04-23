@@ -15,8 +15,8 @@ DATA_AUG_TIMES = 1
 parser = argparse.ArgumentParser(description='')
 parser.add_argument('--src_dir', dest='src_dir', default='data/Train400',
                     help='dir of data')
-parser.add_argument('--save_dir', dest='save_dir', default='data',
-                    help='dir of patches')
+parser.add_argument('--save_file', dest='save_file', default='data/pats',
+                    help='filename of patches')
 parser.add_argument('--patch_size', dest='pat_size', type=int, default=40,
                     help='patch size')
 parser.add_argument('--stride', dest='stride', type=int, default=10,
@@ -30,7 +30,7 @@ parser.add_argument('--work_dir', dest='work_dir', default='.',
 parser.add_argument('--from_file', dest='from_file',
                     default="data/img_clean_pats.npy",
                     help='get pic from file')
-parser.add_argument('--num_pic', dest='num_pic', type=int, default=10,
+parser.add_argument('--num_pic', dest='num_pic', type=int, default=1,
                     help='number of pic to pick')
 args = parser.parse_args()
 
@@ -102,10 +102,8 @@ def generate_patches():
         to_pad = numPatches - count
         inputs[-to_pad:, :, :, :] = inputs[:to_pad, :, :, :]
 
-    save_dir = os.path.join(args.work_dir, args.save_dir)
-    if not os.path.exists(save_dir):
-        os.mkdir(save_dir)
-    np.save(os.path.join(save_dir, "img_clean_pats"), inputs)
+    save_file = os.path.join(args.work_dir, args.save_file)
+    np.save(save_file, inputs)
     print("size of inputs tensor = " + str(inputs.shape))
 
 
