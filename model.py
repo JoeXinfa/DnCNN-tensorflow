@@ -31,36 +31,27 @@ Originally defined at:
 
 #class denoiser(object): # Python2 style
 class denoiser: # Python3 style
-    def __init__(self, sess, input_c_dim=1, sigma=25, batch_size=128,
-                 phase='prod'):
+    def __init__(self, sess, input_c_dim=1, sigma=25, batch_size=128):
         self.sess = sess
         self.input_c_dim = input_c_dim
         self.sigma = sigma
         # build model
-        if phase in ['train', 'test']:
-            self.Y_ = tf.placeholder(tf.float32,
-                [None, None, None, self.input_c_dim], name='clean_image')
-            self.X  = tf.placeholder(tf.float32,
-                [None, None, None, self.input_c_dim], name='noisy_image')
-            self.is_training = tf.placeholder(tf.bool, name='is_training')
-            #self.X = self.Y_ + tf.random_normal(shape=tf.shape(self.Y_),
-            #    stddev=self.sigma / 255.0)  # noisy images
-            #self.X = self.Y_ + tf.truncated_normal(shape=tf.shape(self.Y_),
-            #    stddev=self.sigma / 255.0)  # noisy images
-            self.Y = dncnn(self.X, is_training=self.is_training)
-            self.loss = (1.0 / batch_size) * tf.nn.l2_loss(self.Y_ - self.Y)
-            self.lr = tf.placeholder(tf.float32, name='learning_rate')
-            self.eva_psnr = tf_psnr(self.Y, self.Y_)
-            optimizer = tf.train.AdamOptimizer(self.lr, name='AdamOptimizer')
-            update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-            with tf.control_dependencies(update_ops):
-                self.train_op = optimizer.minimize(self.loss)
-
-        if phase == 'prod':
-            self.XP = tf.placeholder(tf.float32,
-                [None, None, None, self.input_c_dim], name='noisy_image')
-            self.YP = dncnn(self.XP, is_training=False)
-            self.RP = self.XP - self.YP # input - output
+        self.Y_ = tf.placeholder(tf.float32,
+            [None, None, None, self.input_c_dim], name='clean_image')
+        self.X  = tf.placeholder(tf.float32,
+            [None, None, None, self.input_c_dim], name='noisy_image')
+        self.is_training = tf.placeholder(tf.bool, name='is_training')
+        #self.X = self.Y_ + tf.random_normal(shape=tf.shape(self.Y_),
+        #    stddev=self.sigma / 255.0)  # noisy images
+        self.Y = dncnn(self.X, is_training=self.is_training)
+        self.R = self.X - self.Y # residual = input - output
+        self.loss = (1.0 / batch_size) * tf.nn.l2_loss(self.Y_ - self.Y)
+        self.lr = tf.placeholder(tf.float32, name='learning_rate')
+        self.eva_psnr = tf_psnr(self.Y, self.Y_)
+        optimizer = tf.train.AdamOptimizer(self.lr, name='AdamOptimizer')
+        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        with tf.control_dependencies(update_ops):
+            self.train_op = optimizer.minimize(self.loss)
 
         init = tf.global_variables_initializer()
         self.sess.run(init)
@@ -193,9 +184,16 @@ class denoiser: # Python3 style
             return False, 0
 
     def test(self, test_files, ckpt_dir='./checkpoint', save_dir='./test'):
-        """Test DnCNN"""
+        """
+        -i- test_files : list, of string for the filename of noisy image.
+        -i- ckpt_dir : string, path of the folder containing training info.
+        -i- save_dir : string, path of the folder to save the result.
+        Input noisy image, output denoised image.
+        """
         # init variables
-        tf.initialize_all_variables().run()
+        #tf.initialize_all_variables().run() # deprecated
+        init = tf.global_variables_initializer()
+        self.sess.run(init)
         assert len(test_files) != 0, 'No testing data!'
         load_model_status, global_step = self.load(ckpt_dir)
         assert load_model_status == True, '[!] Load weights FAILED...'
@@ -203,44 +201,10 @@ class denoiser: # Python3 style
         psnr_sum = 0
         print("[*] " + 'noise level: ' + str(self.sigma) + " start testing...")
         for idx in range(len(test_files)):
-            clean_image = load_images(test_files[idx])
-            clean_image = clean_image.astype(np.float32) / 255.0
-            output_image, noisy_image = self.sess.run([self.Y, self.X],
-                feed_dict={self.Y_: clean_image, self.is_training: False})
-            groundtruth = np.clip(255 * clean_image, 0, 255).astype('uint8')
-            noisy_img = np.clip(255 * noisy_image, 0, 255).astype('uint8')
-            output_img = np.clip(255 * output_image, 0, 255).astype('uint8')
-            # calculate PSNR
-            psnr = cal_psnr(groundtruth, output_img)
-            print("img%d PSNR: %.2f" % (idx, psnr))
-            psnr_sum += psnr
-            filename = os.path.join(save_dir, 'noisy%d.png' % (idx+1))
-            save_images(filename, noisy_img)
-            filename = os.path.join(save_dir, 'denoised%d.png' % (idx+1))
-            save_images(filename, output_img)
-        avg_psnr = psnr_sum / len(test_files)
-        print("--- Average PSNR %.2f ---" % avg_psnr)
-
-    def prod(self, prod_files, ckpt_dir='./checkpoint', save_dir='./prod'):
-        """
-        -i- prod_files : list, of string for the filename of noisy image.
-        -i- ckpt_dir : string, path of the folder containing training info.
-        -i- save_dir : string, path of the folder to save the result.
-        Input noisy image, output denoised image.
-        """
-        # init variables
-        tf.initialize_all_variables().run()
-        assert len(prod_files) != 0, 'No production data!'
-        load_model_status, global_step = self.load(ckpt_dir)
-        assert load_model_status == True, '[!] Load weights FAILED...'
-        print("[*] Load weights SUCCESS...")
-        psnr_sum = 0
-        print("[*] " + 'noise level: ' + str(self.sigma) + " start testing...")
-        for idx in range(len(prod_files)):
-            noisy_image = load_images(prod_files[idx])
+            noisy_image = load_images(test_files[idx])
             noisy_image = noisy_image.astype(np.float32) / 255.0
-            output_image, diff_image = self.sess.run([self.YP, self.RP],
-                feed_dict={self.XP: noisy_image})
+            output_image, diff_image = self.sess.run([self.Y, self.R],
+                feed_dict={self.X: noisy_image, self.is_training: False})
             noisy_img = np.clip(255 * noisy_image, 0, 255).astype('uint8')
             output_img = np.clip(255 * output_image, 0, 255).astype('uint8')
             diff_img = np.clip(255 * diff_image, 0, 255).astype('uint8')
@@ -250,7 +214,7 @@ class denoiser: # Python3 style
             psnr = cal_psnr(noisy_img, output_img)
             print("img%d PSNR: %.2f" % (idx, psnr))
             psnr_sum += psnr
-            filename = os.path.join(save_dir, 'prod%d.png' % (idx+1))
+            filename = os.path.join(save_dir, 'test%d.png' % (idx+1))
             save_images(filename, noisy_img, output_img, diff_img)
-        avg_psnr = psnr_sum / len(prod_files)
+        avg_psnr = psnr_sum / len(test_files)
         print("--- Average PSNR %.2f ---" % avg_psnr)

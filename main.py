@@ -20,7 +20,7 @@ parser.add_argument('--use_gpu', dest='use_gpu', type=int, default=1,
 parser.add_argument('--sigma', dest='sigma', type=int, default=25,
                     help='noise level')
 parser.add_argument('--phase', dest='phase', default='train',
-                    help='train, test or prod')
+                    help='train or test')
 parser.add_argument('--checkpoint_dir', dest='ckpt_dir', default='checkpoint',
                     help='models are saved here')
 parser.add_argument('--sample_dir', dest='sample_dir', default='sample',
@@ -29,14 +29,10 @@ parser.add_argument('--log_dir', dest='log_dir', default='logs',
                     help='logs are saved here')
 parser.add_argument('--test_dir', dest='test_dir', default='test',
                     help='test sample are saved here')
-parser.add_argument('--prod_dir', dest='prod_dir', default='prod',
-                    help='production results are saved here')
 parser.add_argument('--eval_set', dest='eval_set', default='Set12',
                     help='dataset for eval in training')
 parser.add_argument('--test_set', dest='test_set', default='Set12',
                     help='dataset for testing')
-parser.add_argument('--prod_set', dest='prod_set', default='Joe1',
-                    help='dataset for production')
 parser.add_argument('--work_dir', dest='work_dir', default='.',
                     help='work directory')
 args = parser.parse_args()
@@ -80,27 +76,16 @@ def denoiser_test(denoiser):
     test_files = glob(test_files)
     denoiser.test(test_files, ckpt_dir=ckpt_dir, save_dir=test_dir)
 
-def denoiser_prod(denoiser):
-    prod_files = 'data/prod/{}/*.png'.format(args.prod_set)
-    prod_files = os.path.join(args.work_dir, prod_files)
-    ckpt_dir = os.path.join(args.work_dir, args.ckpt_dir)
-    prod_dir = os.path.join(args.work_dir, args.prod_dir)
-    prod_files = glob(prod_files)
-    denoiser.prod(prod_files, ckpt_dir=ckpt_dir, save_dir=prod_dir)
-
 def main(_):
     ckpt_dir = os.path.join(args.work_dir, args.ckpt_dir)
     sample_dir = os.path.join(args.work_dir, args.sample_dir)
     test_dir = os.path.join(args.work_dir, args.test_dir)
-    prod_dir = os.path.join(args.work_dir, args.prod_dir)
     if not os.path.exists(ckpt_dir):
         os.makedirs(ckpt_dir)
     if not os.path.exists(sample_dir):
         os.makedirs(sample_dir)
     if not os.path.exists(test_dir):
         os.makedirs(test_dir)
-    if not os.path.exists(prod_dir):
-        os.makedirs(prod_dir)
 
     lr = args.lr * np.ones([args.epoch])
     lr[30:] = lr[0] / 10.0
@@ -110,26 +95,22 @@ def main(_):
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.9)
         config = tf.ConfigProto(gpu_options=gpu_options)
         with tf.Session(config=config) as sess:
-            model = denoiser(sess, sigma=args.sigma, phase=args.phase)
+            model = denoiser(sess, sigma=args.sigma)
             if args.phase == 'train':
                 denoiser_train(model, lr=lr)
             elif args.phase == 'test':
                 denoiser_test(model)
-            elif args.phase == 'prod':
-                denoiser_prod(model)
             else:
                 print('[!]Unknown phase')
                 exit(0)
     else:
         print("CPU\n")
         with tf.Session() as sess:
-            model = denoiser(sess, sigma=args.sigma, phase=args.phase)
+            model = denoiser(sess, sigma=args.sigma)
             if args.phase == 'train':
                 denoiser_train(model, lr=lr)
             elif args.phase == 'test':
                 denoiser_test(model)
-            elif args.phase == 'prod':
-                denoiser_prod(model)
             else:
                 print('[!]Unknown phase')
                 exit(0)
