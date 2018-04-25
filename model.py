@@ -31,10 +31,9 @@ Originally defined at:
 
 #class denoiser(object): # Python2 style
 class denoiser: # Python3 style
-    def __init__(self, sess, input_c_dim=1, sigma=25, batch_size=128):
+    def __init__(self, sess, input_c_dim=1, batch_size=128):
         self.sess = sess
         self.input_c_dim = input_c_dim
-        self.sigma = sigma
         # build model
         self.Y_ = tf.placeholder(tf.float32,
             [None, None, None, self.input_c_dim], name='clean_image')
@@ -42,7 +41,7 @@ class denoiser: # Python3 style
             [None, None, None, self.input_c_dim], name='noisy_image')
         self.is_training = tf.placeholder(tf.bool, name='is_training')
         #self.X = self.Y_ + tf.random_normal(shape=tf.shape(self.Y_),
-        #    stddev=self.sigma / 255.0)  # noisy images
+        #    stddev=sigma / 255.0)  # noisy images
         self.Y = dncnn(self.X, is_training=self.is_training)
         self.R = self.X - self.Y # residual = input - output
         self.loss = (1.0 / batch_size) * tf.nn.l2_loss(self.Y_ - self.Y)
@@ -199,7 +198,6 @@ class denoiser: # Python3 style
         assert load_model_status == True, '[!] Load weights FAILED...'
         print("[*] Load weights SUCCESS...")
         psnr_sum = 0
-        print("[*] " + 'noise level: ' + str(self.sigma) + " start testing...")
         for idx in range(len(test_files)):
             noisy_image = load_images(test_files[idx])
             noisy_image = noisy_image.astype(np.float32) / 255.0

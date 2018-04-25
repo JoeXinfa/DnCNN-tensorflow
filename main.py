@@ -17,8 +17,6 @@ parser.add_argument('--lr', dest='lr', type=float, default=0.001,
                     help='initial learning rate for adam')
 parser.add_argument('--use_gpu', dest='use_gpu', type=int, default=1,
                     help='gpu flag, 1 for GPU and 0 for CPU')
-parser.add_argument('--sigma', dest='sigma', type=int, default=25,
-                    help='noise level')
 parser.add_argument('--phase', dest='phase', default='train',
                     help='train or test')
 parser.add_argument('--checkpoint_dir', dest='ckpt_dir', default='checkpoint',
@@ -41,9 +39,9 @@ args = parser.parse_args()
 def denoiser_train(denoiser, lr):
     noisy_file = os.path.join(args.work_dir, 'data/img_noisy_pats.npy')
     clean_file = os.path.join(args.work_dir, 'data/img_clean_pats.npy')
-    evalc_files = 'data/test/{}/clean*.png'.format(args.eval_set)
+    evalc_files = 'data/{}/clean*.png'.format(args.eval_set)
     evalc_files = os.path.join(args.work_dir, evalc_files)
-    evaln_files = 'data/test/{}/noisy*.png'.format(args.eval_set)
+    evaln_files = 'data/{}/noisy*.png'.format(args.eval_set)
     evaln_files = os.path.join(args.work_dir, evaln_files)
     ckpt_dir = os.path.join(args.work_dir, args.ckpt_dir)
     sample_dir = os.path.join(args.work_dir, args.sample_dir)
@@ -95,7 +93,7 @@ def main(_):
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.9)
         config = tf.ConfigProto(gpu_options=gpu_options)
         with tf.Session(config=config) as sess:
-            model = denoiser(sess, sigma=args.sigma)
+            model = denoiser(sess)
             if args.phase == 'train':
                 denoiser_train(model, lr=lr)
             elif args.phase == 'test':
@@ -106,7 +104,7 @@ def main(_):
     else:
         print("CPU\n")
         with tf.Session() as sess:
-            model = denoiser(sess, sigma=args.sigma)
+            model = denoiser(sess)
             if args.phase == 'train':
                 denoiser_train(model, lr=lr)
             elif args.phase == 'test':
