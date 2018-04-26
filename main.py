@@ -27,6 +27,12 @@ parser.add_argument('--log_dir', dest='log_dir', default='logs',
                     help='logs are saved here')
 parser.add_argument('--test_dir', dest='test_dir', default='test',
                     help='test sample are saved here')
+parser.add_argument('--train_clean', dest='train_clean',
+                    default='patches_clean.npy',
+                    help='clean dataset for training')
+parser.add_argument('--train_noisy', dest='train_noisy',
+                    default='patches_noisy.npy',
+                    help='noisy dataset for training')
 parser.add_argument('--eval_set', dest='eval_set', default='Set12',
                     help='dataset for eval in training')
 parser.add_argument('--test_set', dest='test_set', default='Set12',
@@ -37,8 +43,8 @@ args = parser.parse_args()
 
 
 def denoiser_train(denoiser, lr):
-    noisy_file = os.path.join(args.work_dir, 'data/img_noisy_pats.npy')
-    clean_file = os.path.join(args.work_dir, 'data/img_clean_pats.npy')
+    noisy_file = os.path.join(args.work_dir, args.train_noisy)
+    clean_file = os.path.join(args.work_dir, args.train_clean)
     evalc_files = 'data/{}/clean*.png'.format(args.eval_set)
     evalc_files = os.path.join(args.work_dir, evalc_files)
     evaln_files = 'data/{}/noisy*.png'.format(args.eval_set)
@@ -67,7 +73,7 @@ def denoiser_train(denoiser, lr):
 
 
 def denoiser_test(denoiser):
-    test_files = 'data/test/{}/*.png'.format(args.test_set)
+    test_files = 'data/{}/*.png'.format(args.test_set)
     test_files = os.path.join(args.work_dir, test_files)
     ckpt_dir = os.path.join(args.work_dir, args.ckpt_dir)
     test_dir = os.path.join(args.work_dir, args.test_dir)
@@ -78,12 +84,15 @@ def main(_):
     ckpt_dir = os.path.join(args.work_dir, args.ckpt_dir)
     sample_dir = os.path.join(args.work_dir, args.sample_dir)
     test_dir = os.path.join(args.work_dir, args.test_dir)
+    log_dir = os.path.join(args.work_dir, args.log_dir)
     if not os.path.exists(ckpt_dir):
         os.makedirs(ckpt_dir)
     if not os.path.exists(sample_dir):
         os.makedirs(sample_dir)
     if not os.path.exists(test_dir):
         os.makedirs(test_dir)
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
 
     lr = args.lr * np.ones([args.epoch])
     lr[30:] = lr[0] / 10.0
@@ -93,7 +102,7 @@ def main(_):
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.9)
         config = tf.ConfigProto(gpu_options=gpu_options)
         with tf.Session(config=config) as sess:
-            model = denoiser(sess)
+            model = denoiser(sess, batch_size=args.batch_size)
             if args.phase == 'train':
                 denoiser_train(model, lr=lr)
             elif args.phase == 'test':
@@ -104,7 +113,7 @@ def main(_):
     else:
         print("CPU\n")
         with tf.Session() as sess:
-            model = denoiser(sess)
+            model = denoiser(sess, batch_size=args.batch_size)
             if args.phase == 'train':
                 denoiser_train(model, lr=lr)
             elif args.phase == 'test':
