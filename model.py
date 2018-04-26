@@ -197,22 +197,26 @@ class denoiser: # Python3 style
         load_model_status, global_step = self.load(ckpt_dir)
         assert load_model_status == True, '[!] Load weights FAILED...'
         print("[*] Load weights SUCCESS...")
-        psnr_sum = 0
+        impact_sum = 0
         for idx in range(len(test_files)):
             noisy_image = load_images(test_files[idx])
             noisy_image = noisy_image.astype(np.float32) / 255.0
             output_image, diff_image = self.sess.run([self.Y, self.R],
                 feed_dict={self.X: noisy_image, self.is_training: False})
+
             noisy_img = np.clip(255 * noisy_image, 0, 255).astype('uint8')
             output_img = np.clip(255 * output_image, 0, 255).astype('uint8')
             diff_img = np.clip(255 * diff_image, 0, 255).astype('uint8')
+
+            # calculate denoise impact per pixel sample
+            impact = np.sum(diff_img) / diff_img.size
+            print("img%d impact: %.2f" % (idx, impact))
+            impact_sum += impact
+
             # RGB=(0,0,0) for black, (255,255,255) for white
-            diff_img = 255 - diff_img # flip to use white as background
-            # calculate PSNR
-            psnr = cal_psnr(noisy_img, output_img)
-            print("img%d PSNR: %.2f" % (idx, psnr))
-            psnr_sum += psnr
             filename = os.path.join(save_dir, 'test%d.png' % (idx+1))
+            diff_img = 255 - diff_img # flip to use white as background
             save_images(filename, noisy_img, output_img, diff_img)
-        avg_psnr = psnr_sum / len(test_files)
-        print("--- Average PSNR %.2f ---" % avg_psnr)
+
+        avg_impact = impact_sum / len(test_files)
+        print("--- Average impact %.2f ---" % avg_impact)
