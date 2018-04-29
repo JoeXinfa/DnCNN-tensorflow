@@ -13,13 +13,18 @@ def main():
 
     # fn = '/cpfs/lfs02/data/zhuu/seam/subsalt_clean.js'
     # cube = load_cube_javaseis(fn, survey)
-    # fn = '/cpfs/lfs02/data/zhuu/seam/patches_clean.npy'
-    # generate_patches(cube, stride=20, save_file=fn)
+    # fn = '/cpfs/lfs02/data/zhuu/seam/data/patches_clean_il1.npy'
+    # generate_patches(cube, patch_size=100, stride=50, batch_size=9, save_file=fn)
 
     fn = '/cpfs/lfs02/data/zhuu/seam/subsalt_randm.js'
     cube = load_cube_javaseis(fn, survey)
-    fn = '/cpfs/lfs02/data/zhuu/seam/patches_randm.npy'
-    generate_patches(cube, stride=20, save_file=fn)
+    fn = '/cpfs/lfs02/data/zhuu/seam/data/patches_randm_il1.npy'
+    generate_patches(cube, patch_size=100, stride=50, batch_size=9, save_file=fn)
+
+    # fn = '/cpfs/lfs02/data/zhuu/seam/subsalt_noisy.js'
+    # cube = load_cube_javaseis(fn, survey)
+    # fn = '/cpfs/lfs02/data/zhuu/seam/data/patches_noisy.npy'
+    # generate_patches(cube, patch_size=100, stride=50, save_file=fn)
 
 if __name__ == '__main__':
     main()

@@ -31,16 +31,18 @@ def generate_patches(cube, propName=None, step=0, patch_size=40, stride=10,
 
     count = 0
     # calculate the number of patches
-    for i in range(NIL):
+    # for i in range(NIL):
+    for i in [14]:
         # from open PNG file
         #img = Image.open(filepaths[i]).convert('L')  # convert RGB to gray
         #array2d shape (NXL,NDP), transpose so NDP is row and NXL is column.
         array2d = array3d[i].T
         img = array2image(array2d)
         # save a png file for QC
-        if i == 0:
+        if i == 14:
             fn = '/home/zhuu/temp.png'
             img.save(fn, 'png')
+            #exit()
 
         for s in range(len(scales)):
             newsize = (int(img.size[0] * scales[s]),
@@ -53,7 +55,14 @@ def generate_patches(cube, propName=None, step=0, patch_size=40, stride=10,
             for x in range(x1, x2, stride):
                 for y in range(y1, y2, stride):
                     count += 1
+
+        # if i == 14:
+        #     fn = '/home/zhuu/temp2.png'
+        #     img_s.save(fn, 'png')
+
     origin_patch_num = count * DATA_AUG_TIMES
+    print("count, DATA_AUG_TIMES =", count, DATA_AUG_TIMES)
+    print("origin_patch_num =", origin_patch_num)
 
     if origin_patch_num % batch_size != 0:
         numPatches = (origin_patch_num / batch_size + 1) * batch_size
@@ -69,7 +78,8 @@ def generate_patches(cube, propName=None, step=0, patch_size=40, stride=10,
 
     count = 0
     # generate patches
-    for i in range(NIL):
+    # for i in range(NIL):
+    for i in [14]:
         #img = Image.open(filepaths[i]).convert('L')
         array2d = array3d[i].T
         img = array2image(array2d)
@@ -93,6 +103,7 @@ def generate_patches(cube, propName=None, step=0, patch_size=40, stride=10,
                         count += 1
     # pad the batch
     if count < numPatches:
+        print("Padding the batch")
         to_pad = numPatches - count
         inputs[-to_pad:, :, :, :] = inputs[:to_pad, :, :, :]
 
