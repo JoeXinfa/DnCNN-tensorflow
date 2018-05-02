@@ -45,9 +45,10 @@ class denoiser: # Python3 style
         self.Y = dncnn(self.X, is_training=self.is_training)
         self.R = self.X - self.Y # residual = input - output
         self.loss = (1.0 / batch_size) * tf.nn.l2_loss(self.Y_ - self.Y)
-        self.lr = tf.placeholder(tf.float32, name='learning_rate')
+        self.learning_rate = tf.placeholder(tf.float32, name='learning_rate')
         self.eva_psnr = tf_psnr(self.Y, self.Y_)
-        optimizer = tf.train.AdamOptimizer(self.lr, name='AdamOptimizer')
+        optimizer = tf.train.AdamOptimizer(self.learning_rate,
+                                           name='AdamOptimizer')
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
             self.train_op = optimizer.minimize(self.loss)
@@ -99,8 +100,8 @@ class denoiser: # Python3 style
 
     def train(self, noisy_data, clean_data, evaln_data, evalc_data,
               ckpt_dir='./checkpoint', sample_dir='./sample',
-              log_dir='./logs', epoch=50, batch_size=128, lr=0.001,
-              eval_every_epoch=2):
+              log_dir='./logs', epoch_count=50, batch_size=128,
+              learning_rate=None, eval_every_epoch=2):
         """
         -i- noisy_data : array, numpy 4D (numPatches, patchSize, patchSize,
             colorDimension)
@@ -110,15 +111,16 @@ class denoiser: # Python3 style
             Each array is a noisy image for evaluation, value range 0-255.
         -i- evalc_data : list, of 4D array of different size.
             Each array is a clean image for evaluation, value range 0-255.
+        -i- learning_rate : array, learning rate at each epoch.
         """
         # assert data range is between 0 and 1
-        numBatch = int(noisy_data.shape[0] / batch_size)
+        batch_count = int(noisy_data.shape[0] / batch_size)
         # load pretrained model
         load_model_status, global_step = self.load(ckpt_dir)
         if load_model_status:
             iter_num = global_step
-            start_epoch = global_step // numBatch
-            start_step = global_step % numBatch
+            start_epoch = global_step // batch_count
+            start_step = global_step % batch_count
             print("[*] Model restore success!")
         else:
             iter_num = 0
@@ -127,7 +129,7 @@ class denoiser: # Python3 style
             print("[*] Not find pretrained model!")
         # make summary
         tf.summary.scalar('loss', self.loss)
-        tf.summary.scalar('lr', self.lr)
+        tf.summary.scalar('learning_rate', self.learning_rate)
         writer = tf.summary.FileWriter(log_dir, self.sess.graph)
         merged = tf.summary.merge_all()
         summary_psnr = tf.summary.scalar('eva_psnr', self.eva_psnr)
@@ -136,9 +138,9 @@ class denoiser: # Python3 style
         start_time = time.time()
         self.evaluate(iter_num, evaln_data, evalc_data, sample_dir,
                       summary_psnr, writer)
-        for epoch in range(start_epoch, epoch):
+        for epoch in range(start_epoch, epoch_count):
             #np.random.shuffle(noisy_data)
-            for batch_id in range(start_step, numBatch):
+            for batch_id in range(start_step, batch_count):
                 index1 = batch_id * batch_size
                 index2 = (batch_id + 1) * batch_size
                 noisy_batch = noisy_data[index1:index2, :, :, :]
@@ -148,9 +150,10 @@ class denoiser: # Python3 style
                 _, loss, summary = self.sess.run(
                     [self.train_op, self.loss, merged],
                     feed_dict={self.X: noisy_batch, self.Y_: clean_batch,
-                               self.lr: lr[epoch], self.is_training: True})
+                               self.learning_rate: learning_rate[epoch],
+                               self.is_training: True})
                 print("Epoch: %2d, batch: %4d/%4d, time (min): %d, loss: %.6f"
-                      % (epoch + 1, batch_id + 1, numBatch,
+                      % (epoch + 1, batch_id + 1, batch_count,
                          (time.time() - start_time) / 60, loss))
                 iter_num += 1
                 writer.add_summary(summary, iter_num)
@@ -159,6 +162,8 @@ class denoiser: # Python3 style
                               summary_psnr, writer)
                 self.save(iter_num, ckpt_dir)
         print("[*] Finish training.")
+
+    #def train_distributed(self, ps_hosts, worker_hosts, job_name, task_index,
 
     def save(self, iter_num, ckpt_dir, model_name='DnCNN-tensorflow'):
         saver = tf.train.Saver()
