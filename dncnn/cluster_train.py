@@ -115,17 +115,8 @@ def train(server, cluster):
             qop = q.enqueue(1)
             enqueue_ops.append(qop)
 
-    # number of batches in one epoch
     batch_count = int(noisy_data.shape[0] / batch_size)
     print("Batch count %d, Task count %d" % (batch_count, task_count))
-
-    if batch_count >= task_count:
-        batch_stop = batch_count - task_count
-        batch_drop = batch_count % task_count
-        print("WARNING: the last %d batches are unused." % batch_drop)
-    else:
-        #batch_stop = 1 # not work with enqueue/dequeue method
-        raise ValueError("Batch count is smaller than task count.")
 
     is_chief = (task_index == 0)
     if is_chief:
@@ -170,29 +161,29 @@ def train(server, cluster):
         start_time = time.time()
         for epoch in range(epoch_count):
             # Separate data batches to each worker
-            for batch_index in range(0, batch_stop, task_count):
-                current_batch = batch_index + task_index + 1
-                if current_batch <= batch_count:
+            for batch_index in range(0, batch_count, task_count):
+                current_batch = batch_index + task_index
+                if current_batch >= batch_count:
+                    current_batch -= batch_count # wrap around
+                index1 = batch_size * current_batch
+                index2 = batch_size + index1
+                noisy_batch = noisy_data[index1:index2, :, :, :]
+                clean_batch = clean_data[index1:index2, :, :, :]
 
-                    index1 = batch_size * (current_batch - 1)
-                    index2 = batch_size * current_batch
-                    noisy_batch = noisy_data[index1:index2, :, :, :]
-                    clean_batch = clean_data[index1:index2, :, :, :]
+                _, loss_value, summary, step = sess.run(
+                    [train_op, loss, summary_op, global_step],
+                    feed_dict={X: noisy_batch, Y_: clean_batch,
+                               lr: learning_rate, is_training: True})
+                writer.add_summary(summary, step)
 
-                    _, loss_value, summary, step = sess.run(
-                        [train_op, loss, summary_op, global_step],
-                        feed_dict={X: noisy_batch, Y_: clean_batch,
-                                   lr: learning_rate, is_training: True})
-                    writer.add_summary(summary, step)
-
-                    elapsed_time = int((time.time() - start_time) / 60)
-                    start_time = time.time()
-                    print("Step: %4d," % (step+1),
-                          "Epoch: %4d," % (epoch+1),
-                          "Task: %4d of %4d," % (task_index+1, task_count),
-                          "Batch: %4d of %4d," % (current_batch, batch_count),
-                          "Time (min): %d," % elapsed_time,
-                          "Loss: %.6f," % loss_value)
+                elapsed_time = int((time.time() - start_time) / 60)
+                start_time = time.time()
+                print("Step: %4d," % (step+1),
+                      "Epoch: %4d," % (epoch+1),
+                      "Task: %4d of %4d," % (task_index+1, task_count),
+                      "Batch: %4d of %4d," % (current_batch+1, batch_count),
+                      "Time (min): %d," % elapsed_time,
+                      "Loss: %.6f," % loss_value)
 
             # if np.mod(epoch + 1, 2) == 0:
             #     saver = tf.train.Saver()
