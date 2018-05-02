@@ -11,10 +11,24 @@ from dncnn.utils import tf_psnr
 
 FLAGS = None
 
+def create_done_queue(i, worker_count):
+  """Queue used to signal death for i'th ps shard. Intended to have
+  all workers enqueue an item onto it to signal doneness."""
+  with tf.device("/job:ps/task:%d" % (i)):
+    return tf.FIFOQueue(worker_count, tf.int32,
+                        shared_name="done_queue"+str(i))
+
+def create_done_queues(ps_count, worker_count):
+  return [create_done_queue(i, worker_count) for i in range(ps_count)]
+
+
 def main(_):
 
     ps_hosts = FLAGS.ps_hosts.split(',')
     worker_hosts = FLAGS.worker_hosts.split(',')
+
+    # ps_count = len(ps_hosts)
+    worker_count = len(worker_hosts)
 
     cluster = tf.train.ClusterSpec({"ps":ps_hosts, "worker":worker_hosts})
 
@@ -25,7 +39,15 @@ def main(_):
         task_index=FLAGS.task_index)
 
     if FLAGS.job_name == "ps":
-        server.join()
+        sess = tf.Session(server.target)
+        queue = create_done_queue(FLAGS.task_index, worker_count)
+
+        # wait until all workers are done
+        for i in range(worker_count):
+            sess.run(queue.dequeue())
+            print("ps %d received done worker %d" % (FLAGS.task_index, i))
+        print("ps %d: quitting" % (FLAGS.task_index))
+
     elif FLAGS.job_name == "worker":
         train(server, cluster)
 
@@ -35,6 +57,8 @@ def train(server, cluster):
     # config
     #max_step = 1000
     task_count = len(cluster._cluster_spec['worker'])
+    worker_count = len(cluster._cluster_spec['worker'])
+    ps_count = len(cluster._cluster_spec['ps'])
     task_index = FLAGS.task_index
     batch_size = FLAGS.batch_size
     learning_rate = FLAGS.learning_rate
@@ -86,16 +110,22 @@ def train(server, cluster):
         saver = tf.train.Saver(sharded=True)
         print("Variables initialized ...")
 
+        enqueue_ops = []
+        for q in create_done_queues(ps_count, worker_count):
+            qop = q.enqueue(1)
+            enqueue_ops.append(qop)
+
     # number of batches in one epoch
     batch_count = int(noisy_data.shape[0] / batch_size)
     print("Batch count %d, Task count %d" % (batch_count, task_count))
 
-    if batch_count > task_count:
+    if batch_count >= task_count:
         batch_stop = batch_count - task_count
         batch_drop = batch_count % task_count
         print("WARNING: the last %d batches are unused." % batch_drop)
     else:
-        batch_stop = 1
+        #batch_stop = 1 # not work with enqueue/dequeue method
+        raise ValueError("Batch count is smaller than task count.")
 
     is_chief = (task_index == 0)
     if is_chief:
@@ -183,6 +213,12 @@ def train(server, cluster):
         #     clear_devices=True)
         # export_path = ckpt_dir
         # model_exporter.export(export_path, sess)
+
+        # signal to ps shards that we are done
+        #for q in create_done_queues(ps_count, worker_count):
+        #    sess.run(q.enqueue(1))
+        for op in enqueue_ops:
+            sess.run(op)
 
     # builder.save()
     sv.stop()
