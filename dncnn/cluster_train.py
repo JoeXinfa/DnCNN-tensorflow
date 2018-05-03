@@ -46,6 +46,10 @@ def main(_):
             print('ps:%d quitting' % task_index)
 
     elif job_name == "worker":
+        # If worker starts before ps, it raise error
+        # tensorflow.python.framework.errors_impl.UnavailableError: OS Error.
+        # Workaround is make worker servers wait a bit.
+        time.sleep(15)
         train(server, cluster)
     else:
         raise ValueError("Unknow job name.")
