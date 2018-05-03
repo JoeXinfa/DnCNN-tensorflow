@@ -30,7 +30,21 @@ def main(_):
                              task_index=task_index)
 
     if job_name == "ps":
-        server.join()
+        #server.join()
+
+        # create a shared queue on the parameter server
+        # which is visible on /job:ps/task:%d
+        with tf.device('/job:ps/task:%d' % task_index):
+            queue = tf.FIFOQueue(cluster.num_tasks('worker'), tf.int32,
+                                 shared_name='done_queue%d' % task_index)
+
+        # wait for the queue to be filled
+        with tf.Session(server.target) as sess:
+            for i in range(cluster.num_tasks('worker')):
+                sess.run(queue.dequeue())
+                print('ps:%d received "done" from worker:%d' % (task_index, i))
+            print('ps:%d quitting' % task_index)
+
     elif job_name == "worker":
         train(server, cluster)
     else:
@@ -41,7 +55,7 @@ def train(server, cluster):
 
     # config
     max_step = 1000000
-    task_count = len(cluster._cluster_spec['worker'])
+    task_count = cluster.num_tasks('worker')
     task_index = FLAGS.task_index
     batch_size = FLAGS.batch_size
     learning_rate = FLAGS.learning_rate
@@ -90,6 +104,7 @@ def train(server, cluster):
         # which we can execute in a session
         summary_op = tf.summary.merge_all()
         #init_op = tf.global_variables_initializer()
+        #no_op = tf.no_op()
         print("Variables initialized ...")
 
     batch_count = int(noisy_data.shape[0] / batch_size)
@@ -101,8 +116,17 @@ def train(server, cluster):
     else:
         print("Worker %d: Waiting for session to be initialized..." % task_index)
 
+    done_ops = []
+    # create a shared queue on the worker which is visible on /job:ps/task:%d
+    for i in range(cluster.num_tasks('ps')):
+        with tf.device('/job:ps/task:%d' % i):
+            done_queue = tf.FIFOQueue(cluster.num_tasks('worker'), tf.int32,
+                                      shared_name='done_queue' + str(i))
+            done_ops.append(done_queue.enqueue(task_index))
+
     # The StopAtStepHook handles stopping after running given steps.
-    hooks = [tf.train.StopAtStepHook(last_step=max_step)]
+    hooks = [tf.train.StopAtStepHook(last_step=max_step),
+             tf.train.FinalOpsHook([done_ops])]
 
     # The MonitoredTrainingSession takes care of session initialization,
     # restoring from a checkpoint, saving to a checkpoint, and closing
@@ -144,6 +168,10 @@ def train(server, cluster):
                           "Batch: %4d of %4d," % (current_batch+1, batch_count),
                           "Time (min): %d," % elapsed_time,
                           "Loss: %.6f," % loss_value)
+
+        #mon_sess.run([no_op]) # How is no_op related to done_ops?
+        for op in done_ops:
+            mon_sess.run(op)
 
     print("Done")
 
