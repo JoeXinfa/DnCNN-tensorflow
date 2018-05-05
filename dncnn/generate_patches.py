@@ -17,12 +17,12 @@ parser.add_argument('--src_dir', dest='src_dir', default='data/Train400',
                     help='dir of data')
 parser.add_argument('--save_file', dest='save_file', default='data/pats',
                     help='filename of patches')
-parser.add_argument('--patch_size', dest='pat_size', type=int, default=40,
+parser.add_argument('--patch_size', dest='patch_size', type=int, default=40,
                     help='patch size')
 parser.add_argument('--stride', dest='stride', type=int, default=10,
                     help='stride')
 parser.add_argument('--step', dest='step', type=int, default=0, help='step')
-parser.add_argument('--batch_size', dest='bat_size', type=int, default=128,
+parser.add_argument('--batch_size', dest='batch_size', type=int, default=128,
                     help='batch size')
 parser.add_argument('--work_dir', dest='work_dir', default='.',
                     help='work directory')
@@ -36,15 +36,20 @@ args = parser.parse_args()
 
 
 def generate_patches():
+    batch_size = args.batch_size
+    patch_size = args.patch_size
+
     global DATA_AUG_TIMES
     count = 0
     src_dir = os.path.join(args.work_dir, args.src_dir)
     filepaths = glob(src_dir + '/*.png')
     num_pic = args.num_pic
     filepaths = filepaths[:num_pic]
-    print("number of training data %d" % len(filepaths))
+    print("Number of training data %d" % len(filepaths))
+    print("Number of training data used %d" % num_pic)
 
-    scales = [1, 0.9, 0.8, 0.7]
+    #scales = [1, 0.9, 0.8, 0.7]
+    scales = [1]
 
     # calculate the number of patches
     for i in range(len(filepaths)):
@@ -55,25 +60,26 @@ def generate_patches():
             # do not change the original img
             img_s = img.resize(newsize, resample=Image.BICUBIC)
             im_h, im_w = img_s.size
-            x1, x2 = 0 + args.step, im_h - args.pat_size
-            y1, y2 = 0 + args.step, im_w - args.pat_size
+            x1, x2 = 0 + args.step, im_h - patch_size
+            y1, y2 = 0 + args.step, im_w - patch_size
             for x in range(x1, x2, args.stride):
                 for y in range(y1, y2, args.stride):
                     count += 1
-    origin_patch_num = count * DATA_AUG_TIMES
+    patch_count_raw = count * DATA_AUG_TIMES
+    print("count, DATA_AUG_TIMES =", count, DATA_AUG_TIMES)
+    print("patch_count_raw =", patch_count_raw)
 
-    if origin_patch_num % args.bat_size != 0:
-        numPatches = (origin_patch_num / args.bat_size + 1) * args.bat_size
+    if patch_count_raw % batch_size != 0:
+        patch_count = (int(patch_count_raw / batch_size) + 1) * batch_size
     else:
-        numPatches = origin_patch_num
-    numPatches = int(numPatches)
-    numBatches = int(numPatches / args.bat_size)
-    print("patch size = %d, total patches = %d" % (args.pat_size, numPatches))
-    print("batch size = %d, total batches = %d" % (args.bat_size, numBatches))
+        patch_count = patch_count_raw
+    patch_count = int(patch_count)
+    batch_count = int(patch_count / batch_size)
+    print("patch size = %d, total patches = %d" % (patch_size, patch_count))
+    print("batch size = %d, total batches = %d" % (batch_size, batch_count))
 
     # data matrix 4-D
-    inputs = np.zeros((numPatches, args.pat_size, args.pat_size, 1),
-                      dtype="uint8")
+    inputs = np.zeros((patch_count, patch_size, patch_size, 1), dtype="uint8")
 
     count = 0
     # generate patches
@@ -83,23 +89,23 @@ def generate_patches():
             newsize = (int(img.size[0] * scales[s]),
                        int(img.size[1] * scales[s]))
             img_s = img.resize(newsize, resample=Image.BICUBIC)
+            # extend one dimension
             img_s = np.reshape(np.array(img_s, dtype="uint8"),
                                (img_s.size[0], img_s.size[1], 1))
-            # extend one dimension
 
             for j in range(DATA_AUG_TIMES):
                 im_h, im_w, _ = img_s.shape
-                x1, x2 = 0 + args.step, im_h - args.pat_size
-                y1, y2 = 0 + args.step, im_w - args.pat_size
+                x1, x2 = 0 + args.step, im_h - patch_size
+                y1, y2 = 0 + args.step, im_w - patch_size
                 for x in range(x1, x2, args.stride):
                     for y in range(y1, y2, args.stride):
                         inputs[count, :, :, :] = data_augmentation(
-                            img_s[x:x+args.pat_size, y:y+args.pat_size, :],
-                            random.randint(0, 7))
+                            img_s[x:x+patch_size, y:y+patch_size, :], 0)
+                            #random.randint(0, 7))
                         count += 1
     # pad the batch
-    if count < numPatches:
-        to_pad = numPatches - count
+    if count < patch_count:
+        to_pad = patch_count - count
         inputs[-to_pad:, :, :, :] = inputs[:to_pad, :, :, :]
 
     save_file = os.path.join(args.work_dir, args.save_file)

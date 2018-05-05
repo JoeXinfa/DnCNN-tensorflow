@@ -60,21 +60,21 @@ def generate_patches(cube, propName=None, step=0, patch_size=40, stride=10,
         #     fn = '/home/zhuu/temp2.png'
         #     img_s.save(fn, 'png')
 
-    origin_patch_num = count * DATA_AUG_TIMES
+    patch_count_raw = count * DATA_AUG_TIMES
     print("count, DATA_AUG_TIMES =", count, DATA_AUG_TIMES)
-    print("origin_patch_num =", origin_patch_num)
+    print("patch_count_raw =", patch_count_raw)
 
-    if origin_patch_num % batch_size != 0:
-        numPatches = (origin_patch_num / batch_size + 1) * batch_size
+    if patch_count_raw % batch_size != 0:
+        patch_count = (int(patch_count_raw / batch_size) + 1) * batch_size
     else:
-        numPatches = origin_patch_num
-    numPatches = int(numPatches)
-    numBatches = int(numPatches / batch_size)
-    print("patch size = %d, total patches = %d" % (patch_size, numPatches))
-    print("batch size = %d, total batches = %d" % (batch_size, numBatches))
+        patch_count = patch_count_raw
+    patch_count = int(patch_count)
+    batch_count = int(patch_count / batch_size)
+    print("patch size = %d, total patches = %d" % (patch_size, patch_count))
+    print("batch size = %d, total batches = %d" % (batch_size, batch_count))
 
     # data matrix 4-D
-    inputs = np.zeros((numPatches, patch_size, patch_size, 1), dtype="uint8")
+    inputs = np.zeros((patch_count, patch_size, patch_size, 1), dtype="uint8")
 
     count = 0
     # generate patches
@@ -98,13 +98,13 @@ def generate_patches(cube, propName=None, step=0, patch_size=40, stride=10,
                 for x in range(x1, x2, stride):
                     for y in range(y1, y2, stride):
                         inputs[count, :, :, :] = data_augmentation(
-                            img_s[x:x+patch_size, y:y+patch_size, :],
-                            random.randint(0, 7))
+                            img_s[x:x+patch_size, y:y+patch_size, :], 0)
+                            # random.randint(0, 7))
                         count += 1
     # pad the batch
-    if count < numPatches:
+    if count < patch_count:
         print("Padding the batch")
-        to_pad = numPatches - count
+        to_pad = patch_count - count
         inputs[-to_pad:, :, :, :] = inputs[:to_pad, :, :, :]
 
     if save_file is None:
